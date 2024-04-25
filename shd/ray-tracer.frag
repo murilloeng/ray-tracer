@@ -18,6 +18,7 @@ struct Light
 struct Material
 {
 	vec3 m_color;
+	float m_reflectivity;
 };
 struct Hit
 {
@@ -42,18 +43,18 @@ struct Sphere
 	Material m_material;
 };
 
-const int iterations = 16;
+const int reflection_max = 16;
 const float focal_length = 1.0;
 const vec3 camera_position = vec3(0.0);
-Light light = Light(vec3(1.0, 1.0, 1.0), vec3(0, 5.0, -2.0));
+Light light = Light(2 * vec3(1.0, 1.0, 1.0), vec3(cos(frame / 20.0), 5.0, sin(frame / 20.0) - 2.0));
 
 const int ns = 3;
 Sphere spheres[ns] = Sphere[ns](
-	Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0))),
-	Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0))),
-	Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0)))
+	Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), 0.5)),
+	Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), 0.5)),
+	Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), 0.5))
 );
-Plane plane = Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5)));
+Plane plane = Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2));
 
 bool hit_plane(Ray ray, Plane plane, inout Hit hit)
 {
@@ -131,27 +132,56 @@ bool ray_intersection(Ray ray, inout Hit hit, int id)
 vec3 ray_color(Ray ray)
 {
 	//data
-	Hit hit;
-	vec3 rd = normalize(ray.m_direction);
-	//intersection
-	if(ray_intersection(ray, hit, -1))
+	Hit hit, hit_light;
+	vec3 light_direction;
+	vec3 color = vec3(0.0, 0.0, 0.0);
+	//reflections
+	hit.m_id = -1;
+	int reflections_counter = 0;
+	float reflection_factor = 1.0;
+	for(int reflection = 0; reflection < reflection_max; reflection++)
 	{
-		Hit hit_light;
-		Ray ray_light = Ray(hit.m_point, light.m_position - hit.m_point);
-		if(ray_intersection(ray_light, hit_light, hit.m_id))
+		//intersection
+		if(!ray_intersection(ray, hit, hit.m_id)) break;
+		//diffuse light
+		reflections_counter++;
+		light_direction = normalize(light.m_position - hit.m_point);
+		if(dot(light_direction, hit.m_normal) > 0 && !ray_intersection(Ray(hit.m_point, light_direction), hit_light, hit.m_id))
 		{
-			return vec3(0.0);
+			color += reflection_factor * (1 - hit.m_material.m_reflectivity) * dot(light_direction, hit.m_normal) * light.m_color * hit.m_material.m_color;
 		}
-		else
-		{
-			vec3 ld = normalize(light.m_position - hit.m_point);
-			return max(dot(ld, hit.m_normal), 0.0) * hit.m_material.m_color;
-		}
+		//reflection
+		reflection_factor *= hit.m_material.m_reflectivity;
+		ray = Ray(hit.m_point, reflect(ray.m_direction, hit.m_normal));
+	}
+	//return
+	if(reflections_counter != 0)
+	{
+		return color;
 	}
 	else
 	{
+		vec3 rd = normalize(ray.m_direction);
 		return vec3((1 - rd[1]) / 2, (1 - rd[1]) / 2, 1);
 	}
+	// if(ray_intersection(ray, hit, -1))
+	// {
+	// 	Hit hit_light;
+	// 	Ray ray_light = Ray(hit.m_point, light.m_position - hit.m_point);
+	// 	if(ray_intersection(ray_light, hit_light, hit.m_id))
+	// 	{
+	// 		return vec3(0.0);
+	// 	}
+	// 	else
+	// 	{
+	// 		vec3 ld = normalize(light.m_position - hit.m_point);
+	// 		return max(dot(ld, hit.m_normal), 0.0) * hit.m_material.m_color;
+	// 	}
+	// }
+	// else
+	// {
+	// 	return vec3((1 - rd[1]) / 2, (1 - rd[1]) / 2, 1);
+	// }
 }
 
 void main(void)
