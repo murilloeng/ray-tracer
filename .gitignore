@@ -1,0 +1,11 @@
+*
+!*/
+!*.md
+!*.sh
+!*.cpp
+!*.hpp
+!*.vert
+!*.frag
+!*.json
+!*Makefile
+!.gitignore

@@ -1,0 +1,32 @@
+{
+	"configurations": 
+	[
+		{
+			"name": "Linux",
+			"includePath": 
+			[
+				"${workspaceFolder}/.."
+			],
+			"defines": [],
+			"cStandard": "gnu17",
+			"cppStandard": "gnu++17",
+			"intelliSenseMode": "gcc-x64",
+			"compilerPath": "/usr/bin/gcc"
+		},
+		{
+			"name": "Win32",
+			"includePath":
+			[
+				"${workspaceFolder}/.."
+			],
+			"defines":
+			[
+				"NOMINMAX",
+				"_USE_MATH_DEFINES"
+			],
+			"cppStandard": "c++20",
+			"intelliSenseMode": "windows-msvc-x64"
+		}
+	],
+	"version": 4
+}
