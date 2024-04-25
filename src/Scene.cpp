@@ -1,7 +1,7 @@
 //ray-tracer
-#include "ray-tracer-2/inc/Scene.hpp"
-#include "ray-tracer-2/inc/Shader.hpp"
-#include "ray-tracer-2/inc/Program.hpp"
+#include "ray-tracer/inc/Scene.hpp"
+#include "ray-tracer/inc/Shader.hpp"
+#include "ray-tracer/inc/Program.hpp"
 
 namespace ray_tracer
 {

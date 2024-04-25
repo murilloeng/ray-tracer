@@ -1,5 +1,5 @@
 //canvas
-#include "ray-tracer-2/inc/Shader.hpp"
+#include "ray-tracer/inc/Shader.hpp"
 
 namespace ray_tracer
 {
