@@ -32,6 +32,12 @@ namespace ray_tracer
 		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 	}
 
+	//data
+	Program* Scene::program(void) const
+	{
+		return m_program;
+	}
+
 	//setup
 	void Scene::setup_gl(void)
 	{

@@ -19,6 +19,9 @@ namespace ray_tracer
 		//draw
 		void draw(void);
 
+		//data
+		Program* program(void) const;
+
 	private:
 		//setup
 		void setup_gl(void);

@@ -9,11 +9,18 @@
 
 //ray-tracer
 #include "ray-tracer-2/inc/Scene.hpp"
+#include "ray-tracer-2/inc/Program.hpp"
 
 //data
+static unsigned frame = 0;
 static ray_tracer::Scene* scene;
 
 //callbacks
+static void callback_idle(void)
+{
+	glUniform1i(glGetUniformLocation(scene->program()->id(), "frame"), frame++);
+	glutPostRedisplay();
+}
 static void callback_display(void)
 {
 	//clear
@@ -22,6 +29,13 @@ static void callback_display(void)
 	scene->draw();
 	//buffers
 	glutSwapBuffers();
+}
+static void callback_reshape(int width, int height)
+{
+	glViewport(0, 0, width, height);
+	glUniform1i(glGetUniformLocation(scene->program()->id(), "width"), width);
+	glUniform1i(glGetUniformLocation(scene->program()->id(), "height"), height);
+	glutPostRedisplay();
 }
 static void callback_keyboard(unsigned char key, int x1, int x2)
 {
@@ -50,11 +64,11 @@ int main(int argc, char** argv)
 	}
 	scene = new ray_tracer::Scene;
 	//callbacks
-	// glutIdleFunc(callback_idle);
+	glutIdleFunc(callback_idle);
 	// glutMouseFunc(callback_mouse);
 	// glutMotionFunc(callback_motion);
 	glutDisplayFunc(callback_display);
-	// glutReshapeFunc(callback_reshape);
+	glutReshapeFunc(callback_reshape);
 	// glutSpecialFunc(callback_special);
 	// glutMouseWheelFunc(callback_wheel);
 	glutKeyboardFunc(callback_keyboard);
