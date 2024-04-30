@@ -47,18 +47,56 @@ const float t_min = 1e-5;
 const float focal_length = 1;
 const int reflection_max = 16;
 const vec3 camera_position = vec3(0);
-Light light = Light(100 * vec3(1, 1, 1), vec3(4 * cos(frame / 100.0), 5, -2));
 
-const int ns = 3;
-const int np = 1;
-Sphere spheres[ns] = Sphere[ns](
-	Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), 0.5)),
-	Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), 0.5)),
-	Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), 0.5))
-);
-Plane planes[np] = Plane[np](
-	Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2))
-);
+// const int ns = 3;
+// const int np = 1;
+// const int nl = 1;
+// Sphere spheres[ns] = Sphere[ns](
+// 	Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), 0.5)),
+// 	Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), 0.5)),
+// 	Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), 0.5))
+// );
+// Plane planes[np] = Plane[np](
+// 	Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2))
+// );
+// Light lights[nl] = Light[nl](
+// 	Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 100.0), 5, -2))
+// );
+// Light light_ambient = Light(0.2 * vec3(1, 1, 1), vec3(0));
+
+const int nl_max = 10;
+const int ns_max = 10;
+const int np_max = 10;
+const int scene_index = 0;
+
+int nl;
+int ns;
+int np;
+Light light_ambient;
+Light lights[nl_max];
+Plane planes[np_max];
+Sphere spheres[ns_max];
+
+void scene_1(void)
+{
+	//data
+	nl = 1;
+	ns = 3;
+	np = 1;
+	//lights
+	light_ambient = Light(0.2 * vec3(1, 1, 1), vec3(0));
+	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 100.0), 5, -2));
+	//spheres
+	spheres[0] = Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), 0.5));
+	spheres[1] = Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), 0.5));
+	spheres[2] = Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), 0.5));
+	//planes
+	planes[0] = Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2));
+}
+void scene(void)
+{
+	if(scene_index == 0) scene_1();
+}
 
 bool hit_plane(Ray ray, Plane plane, inout Hit hit)
 {
@@ -135,19 +173,25 @@ vec3 ray_color(Ray ray)
 {
 	//data
 	Hit hit, hit_shadow;
-	vec3 light_direction;
 	vec3 color = vec3(0);
 	//color
 	if(ray_intersection(ray, hit))
 	{
-		//data
-		vec3 u = light.m_position - hit.m_point;
-		//shadow
-		if(ray_intersection(Ray(hit.m_point, normalize(u)), hit_shadow))
+		//lights
+		for(int i = 0; i < nl; i++)
 		{
-			return vec3(0);
+			//data
+			vec3 u = lights[i].m_position - hit.m_point;
+			//shadow
+			if(!ray_intersection(Ray(hit.m_point, normalize(u)), hit_shadow))
+			{
+				color += dot(hit.m_normal, normalize(u)) / dot(u, u) * lights[i].m_color * hit.m_material.m_color;
+			}
 		}
-		return dot(hit.m_normal, normalize(u)) / dot(u, u) * light.m_color * hit.m_material.m_color;
+		//ambient
+		color += light_ambient.m_color * hit.m_material.m_color;
+		//return
+		return color;
 	}
 	else
 	{
@@ -164,6 +208,7 @@ void main(void)
 	pixel_position[0] = (2 * gl_FragCoord.x - width) / height;
 	pixel_position[1] = (2 * gl_FragCoord.y - height) / height;
 	//ray
+	scene();
 	Ray ray = Ray(camera_position, normalize(pixel_position - camera_position));
 	//fragment
 	fragment_color = vec4(ray_color(ray), 1);
