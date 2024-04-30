@@ -43,18 +43,22 @@ struct Sphere
 	Material m_material;
 };
 
+const float t_min = 1e-5;
+const float focal_length = 1;
 const int reflection_max = 16;
-const float focal_length = 1.0;
-const vec3 camera_position = vec3(0.0);
-Light light = Light(2 * vec3(1.0, 1.0, 1.0), vec3(cos(frame / 20.0), 5.0, sin(frame / 20.0) - 2.0));
+const vec3 camera_position = vec3(0);
+Light light = Light(100 * vec3(1, 1, 1), vec3(4 * cos(frame / 100.0), 5, -2));
 
 const int ns = 3;
+const int np = 1;
 Sphere spheres[ns] = Sphere[ns](
 	Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), 0.5)),
 	Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), 0.5)),
 	Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), 0.5))
 );
-Plane plane = Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2));
+Plane planes[np] = Plane[np](
+	Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2))
+);
 
 bool hit_plane(Ray ray, Plane plane, inout Hit hit)
 {
@@ -66,12 +70,11 @@ bool hit_plane(Ray ray, Plane plane, inout Hit hit)
 	vec3 pn = plane.m_normal;
 	//parallel
 	if(abs(dot(rd, pn)) < 1e-5) return false;
-	//behind
+	//plane hit
 	float t = dot(px - ro, pn) / dot(rd, pn);
-	if(t < 0.0) return false;
-	//hit
 	hit = Hit(plane.m_id, t, ro + t * rd, pn, plane.m_material);
-	return true;
+	//return
+	return t > t_min;
 }
 bool hit_sphere(Ray ray, Sphere sphere, inout Hit hit)
 {
@@ -81,27 +84,23 @@ bool hit_sphere(Ray ray, Sphere sphere, inout Hit hit)
 	//sphere
 	vec3 sc = sphere.m_center;
 	float sr = sphere.m_radius;
-	//hit
-	float a = dot(rd, rd);
-	float b = 2.0 * dot(rd, ro - sc);
+	//sphere check
+	float b = 2 * dot(rd, ro - sc);
 	float c = dot(ro - sc, ro - sc) - sr * sr;
-	float d = b * b - 4.0 * a * c;
-	if(d < 0.0)
-	{
-		return false;
-	}
-	else
-	{
-		float t1 = (-b - sqrt(d)) / 2.0 / a;
-		float t2 = (-b + sqrt(d)) / 2.0 / a;
-		if(t1 < 0.0 && t2 < 0.0) return false;
-		float t = t1 > 0.0 ? t1 : t2;
-		hit = Hit(sphere.m_id, t, ro + t * rd, normalize(ro + t * rd - sc), sphere.m_material);
-		return true;
-	}
+	float d = b * b - 4 * c;
+	if(d < 0) return false;
+	//sphere check
+	float t1 = (-b - sqrt(d)) / 2;
+	float t2 = (-b + sqrt(d)) / 2;
+	if(t1 < t_min && t2 < t_min) return false;
+	//sphere hit
+	float t = t1 > t_min ? t1 : t2;
+	hit = Hit(sphere.m_id, t, ro + t * rd, normalize(ro + t * rd - sc), sphere.m_material);
+	//return
+	return true;
 }
 
-bool ray_intersection(Ray ray, inout Hit hit, int id)
+bool ray_intersection(Ray ray, inout Hit hit)
 {
 	//data
 	Hit object_hit;
@@ -109,7 +108,7 @@ bool ray_intersection(Ray ray, inout Hit hit, int id)
 	//objects
 	for(int i = 0; i < ns; i++)
 	{
-		if(spheres[i].m_id != id && hit_sphere(ray, spheres[i], object_hit))
+		if(hit_sphere(ray, spheres[i], object_hit))
 		{
 			if(!test || hit.m_t > object_hit.m_t)
 			{
@@ -118,13 +117,16 @@ bool ray_intersection(Ray ray, inout Hit hit, int id)
 			test = true;
 		}
 	}
-	if(plane.m_id != id && hit_plane(ray, plane, object_hit))
+	for(int i = 0; i < np; i++)
 	{
-		if(!test || hit.m_t > object_hit.m_t)
+		if(hit_plane(ray, planes[i], object_hit))
 		{
-			hit = object_hit;
+			if(!test || hit.m_t > object_hit.m_t)
+			{
+				hit = object_hit;
+			}
+			test = true;
 		}
-		test = true;
 	}
 	//return
 	return test;
@@ -132,56 +134,26 @@ bool ray_intersection(Ray ray, inout Hit hit, int id)
 vec3 ray_color(Ray ray)
 {
 	//data
-	Hit hit, hit_light;
+	Hit hit, hit_shadow;
 	vec3 light_direction;
-	vec3 color = vec3(0.0, 0.0, 0.0);
-	//reflections
-	hit.m_id = -1;
-	int reflections_counter = 0;
-	float reflection_factor = 1.0;
-	for(int reflection = 0; reflection < reflection_max; reflection++)
+	vec3 color = vec3(0);
+	//color
+	if(ray_intersection(ray, hit))
 	{
-		//intersection
-		if(!ray_intersection(ray, hit, hit.m_id)) break;
-		//diffuse light
-		reflections_counter++;
-		light_direction = normalize(light.m_position - hit.m_point);
-		if(dot(light_direction, hit.m_normal) > 0 && !ray_intersection(Ray(hit.m_point, light_direction), hit_light, hit.m_id))
+		//data
+		vec3 u = light.m_position - hit.m_point;
+		//shadow
+		if(ray_intersection(Ray(hit.m_point, normalize(u)), hit_shadow))
 		{
-			color += reflection_factor * (1 - hit.m_material.m_reflectivity) * dot(light_direction, hit.m_normal) * light.m_color * hit.m_material.m_color;
+			return vec3(0);
 		}
-		//reflection
-		reflection_factor *= hit.m_material.m_reflectivity;
-		ray = Ray(hit.m_point, reflect(ray.m_direction, hit.m_normal));
-	}
-	//return
-	if(reflections_counter != 0)
-	{
-		return color;
+		return dot(hit.m_normal, normalize(u)) / dot(u, u) * light.m_color * hit.m_material.m_color;
 	}
 	else
 	{
 		vec3 rd = normalize(ray.m_direction);
 		return vec3((1 - rd[1]) / 2, (1 - rd[1]) / 2, 1);
 	}
-	// if(ray_intersection(ray, hit, -1))
-	// {
-	// 	Hit hit_light;
-	// 	Ray ray_light = Ray(hit.m_point, light.m_position - hit.m_point);
-	// 	if(ray_intersection(ray_light, hit_light, hit.m_id))
-	// 	{
-	// 		return vec3(0.0);
-	// 	}
-	// 	else
-	// 	{
-	// 		vec3 ld = normalize(light.m_position - hit.m_point);
-	// 		return max(dot(ld, hit.m_normal), 0.0) * hit.m_material.m_color;
-	// 	}
-	// }
-	// else
-	// {
-	// 	return vec3((1 - rd[1]) / 2, (1 - rd[1]) / 2, 1);
-	// }
 }
 
 void main(void)
@@ -192,7 +164,7 @@ void main(void)
 	pixel_position[0] = (2 * gl_FragCoord.x - width) / height;
 	pixel_position[1] = (2 * gl_FragCoord.y - height) / height;
 	//ray
-	Ray ray = Ray(camera_position, pixel_position - camera_position);
+	Ray ray = Ray(camera_position, normalize(pixel_position - camera_position));
 	//fragment
 	fragment_color = vec4(ray_color(ray), 1);
 }
