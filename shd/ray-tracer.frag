@@ -18,14 +18,15 @@ struct Light
 struct Material
 {
 	vec3 m_color;
-	float m_reflectivity;
+	bool m_metalic;
+	float m_roughness;
 };
 struct Hit
 {
-	int m_id;
 	float m_t;
 	vec3 m_point;
 	vec3 m_normal;
+	int m_object_id;
 	Material m_material;
 };
 struct Plane
@@ -43,27 +44,6 @@ struct Sphere
 	Material m_material;
 };
 
-const float t_min = 1e-5;
-const float focal_length = 1;
-const int reflection_max = 16;
-const vec3 camera_position = vec3(0);
-
-// const int ns = 3;
-// const int np = 1;
-// const int nl = 1;
-// Sphere spheres[ns] = Sphere[ns](
-// 	Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), 0.5)),
-// 	Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), 0.5)),
-// 	Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), 0.5))
-// );
-// Plane planes[np] = Plane[np](
-// 	Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2))
-// );
-// Light lights[nl] = Light[nl](
-// 	Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 100.0), 5, -2))
-// );
-// Light light_ambient = Light(0.2 * vec3(1, 1, 1), vec3(0));
-
 const int nl_max = 10;
 const int ns_max = 10;
 const int np_max = 10;
@@ -77,6 +57,12 @@ Light lights[nl_max];
 Plane planes[np_max];
 Sphere spheres[ns_max];
 
+const float t_min = 1e-5;
+const float focal_length = 1;
+const float pi = 3.141592654;
+const int reflection_max = 16;
+const vec3 camera_position = vec3(0);
+
 void scene_1(void)
 {
 	//data
@@ -87,15 +73,30 @@ void scene_1(void)
 	light_ambient = Light(0.2 * vec3(1, 1, 1), vec3(0));
 	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 100.0), 5, -2));
 	//spheres
-	spheres[0] = Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), 0.5));
-	spheres[1] = Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), 0.5));
-	spheres[2] = Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), 0.5));
+	spheres[0] = Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), false, 0.5));
+	spheres[1] = Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), false, 0.5));
+	spheres[2] = Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), false, 0.5));
 	//planes
-	planes[0] = Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), 0.2));
+	planes[0] = Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), false, 0.2));
+}
+void scene_2(void)
+{
+	//data
+	nl = 1;
+	ns = 1;
+	np = 0;
+	//lights
+	light_ambient = Light(0 * vec3(1, 1, 1), vec3(0));
+	lights[0] = Light(2 * vec3(1, 1, 1), vec3(sin(frame / 20.0), 0, cos(frame / 20.0) - 2));
+	//spheres
+	spheres[0] = Sphere(0, vec3(0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), false, 0.8));
+	//planes
+	planes[0] = Plane(1, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), false, 0.2));
 }
 void scene(void)
 {
 	if(scene_index == 0) scene_1();
+	if(scene_index == 1) scene_2();
 }
 
 bool hit_plane(Ray ray, Plane plane, inout Hit hit)
@@ -110,7 +111,7 @@ bool hit_plane(Ray ray, Plane plane, inout Hit hit)
 	if(abs(dot(rd, pn)) < 1e-5) return false;
 	//plane hit
 	float t = dot(px - ro, pn) / dot(rd, pn);
-	hit = Hit(plane.m_id, t, ro + t * rd, pn, plane.m_material);
+	hit = Hit(t, ro + t * rd, pn, plane.m_id, plane.m_material);
 	//return
 	return t > t_min;
 }
@@ -133,9 +134,32 @@ bool hit_sphere(Ray ray, Sphere sphere, inout Hit hit)
 	if(t1 < t_min && t2 < t_min) return false;
 	//sphere hit
 	float t = t1 > t_min ? t1 : t2;
-	hit = Hit(sphere.m_id, t, ro + t * rd, normalize(ro + t * rd - sc), sphere.m_material);
+	hit = Hit(t, ro + t * rd, normalize(ro + t * rd - sc), sphere.m_id, sphere.m_material);
 	//return
 	return true;
+}
+
+//PBR
+float normal_distribution(float alpha, vec3 N, vec3 H)
+{
+	float a2 = alpha * alpha;
+	float dNH2 = pow(max(dot(N, H), 0), 2);
+	return a2 / pi / pow(1 - (1 - a2) * dNH2, 2);
+}
+float shadowing(float alpha, vec3 N, vec3 X)
+{
+	float k = alpha / 2;
+	float dNX = max(dot(N, X), 0);
+	return dNX / (k + (1 - k) * dNX);
+}
+float shadowing(float alpha, vec3 N, vec3 V, vec3 L)
+{
+	return shadowing(alpha, N, V) * shadowing(alpha, N, L);
+}
+vec3 fresnel(vec3 F0, vec3 V, vec3 H)
+{
+	float dVH = max(dot(V, H), 0);
+	return F0 + (vec3(1) - F0) * pow(1 - dVH, 5);
 }
 
 bool ray_intersection(Ray ray, inout Hit hit)
@@ -181,23 +205,34 @@ vec3 ray_color(Ray ray)
 		for(int i = 0; i < nl; i++)
 		{
 			//data
-			vec3 u = lights[i].m_position - hit.m_point;
+			vec3 N = hit.m_normal;
+			vec3 V = normalize(camera_position - hit.m_point);
+			vec3 L = normalize(lights[i].m_position - hit.m_point);
+			//PBR model
+			vec3 H = normalize(L + V);
+			float dNV = max(dot(N, V), 0);
+			float dNL = max(dot(N, L), 0);
+			vec3 F = fresnel(hit.m_material.m_color, V, H);
+			float d = length(lights[i].m_position - hit.m_point);
+			float G = shadowing(hit.m_material.m_roughness, N, V, L);
+			float D = normal_distribution(hit.m_material.m_roughness, N, H);
+			//PBR diffuse
+			vec3 ks = F;
+			vec3 kd = 1 - F;
+			bool bd = !hit.m_material.m_metalic;
+			vec3 fs = vec3(D * G / 4 / dNV / dNL);
+			vec3 fd = hit.m_material.m_color / pi;
 			//shadow
-			if(!ray_intersection(Ray(hit.m_point, normalize(u)), hit_shadow))
+			if((!ray_intersection(Ray(hit.m_point, L), hit_shadow) || hit_shadow.m_t > d) && dot(N, L) > 0)
 			{
-				color += dot(hit.m_normal, normalize(u)) / dot(u, u) * lights[i].m_color * hit.m_material.m_color;
+				color += (int(bd) * kd * fd + ks * fs) * lights[i].m_color * hit.m_material.m_color / d / d * dot(N, L);
 			}
 		}
 		//ambient
 		color += light_ambient.m_color * hit.m_material.m_color;
-		//return
-		return color;
 	}
-	else
-	{
-		vec3 rd = normalize(ray.m_direction);
-		return vec3((1 - rd[1]) / 2, (1 - rd[1]) / 2, 1);
-	}
+	//return
+	return color;
 }
 
 void main(void)
