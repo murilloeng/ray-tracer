@@ -36,6 +36,14 @@ struct Plane
 	vec3 m_normal;
 	Material m_material;
 };
+struct Board
+{
+	int m_id;
+	vec3 m_point;
+	vec3 m_normal;
+	Material m_material_1;
+	Material m_material_2;
+};
 struct Sphere
 {
 	int m_id;
@@ -47,14 +55,17 @@ struct Sphere
 const int nl_max = 10;
 const int ns_max = 10;
 const int np_max = 10;
+const int nc_max = 10;
 const int scene_index = 0;
 
 int nl;
-int ns;
 int np;
+int nb;
+int ns;
 Light light_ambient;
 Light lights[nl_max];
 Plane planes[np_max];
+Board boards[nc_max];
 Sphere spheres[ns_max];
 
 const float t_min = 1e-5;
@@ -67,31 +78,33 @@ void scene_1(void)
 {
 	//data
 	nl = 1;
+	np = 0;
+	nb = 1;
 	ns = 3;
-	np = 1;
 	//lights
 	light_ambient = Light(0.2 * vec3(1, 1, 1), vec3(0));
-	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 100.0), 5, -2));
+	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 100.0), 2, -2));
 	//spheres
-	spheres[0] = Sphere(0, vec3(-2.0, 0.0, -2.0), 0.5, Material(vec3(1.0, 0.0, 0.0), false, 0.5));
-	spheres[1] = Sphere(1, vec3(+0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 1.0, 0.0), false, 0.5));
-	spheres[2] = Sphere(2, vec3(+2.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), false, 0.5));
-	//planes
-	planes[0] = Plane(3, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), false, 0.2));
+	spheres[0] = Sphere(0, vec3(-2, 0, -2), 0.5, Material(vec3(1, 0, 0), false, 0.5));
+	spheres[1] = Sphere(1, vec3(+0, 0, -2), 0.5, Material(vec3(0, 1, 0), false, 0.5));
+	spheres[2] = Sphere(2, vec3(+2, 0, -2), 0.5, Material(vec3(0, 0, 1), false, 0.5));
+	//boards
+	boards[0] = Board(3, vec3(0, -1, 0), vec3(0, 1, 0), Material(vec3(0, 0, 0), false, 0.2), Material(vec3(1, 1, 1), false, 0.2));
 }
 void scene_2(void)
 {
 	//data
 	nl = 1;
-	ns = 1;
 	np = 0;
+	nb = 0;
+	ns = 1;
 	//lights
 	light_ambient = Light(0 * vec3(1, 1, 1), vec3(0));
 	lights[0] = Light(2 * vec3(1, 1, 1), vec3(sin(frame / 20.0), 0, cos(frame / 20.0) - 2));
 	//spheres
-	spheres[0] = Sphere(0, vec3(0.0, 0.0, -2.0), 0.5, Material(vec3(0.0, 0.0, 1.0), false, 0.8));
+	spheres[0] = Sphere(0, vec3(0, 0, -2), 0.5, Material(vec3(0, 0, 1), false, 0.8));
 	//planes
-	planes[0] = Plane(1, vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), Material(vec3(0.5, 0.5, 0.5), false, 0.2));
+	planes[0] = Plane(1, vec3(0, -1, 0), vec3(0, 1, 0), Material(vec3(0.5, 0.5, 0.5), false, 0.2));
 }
 void scene(void)
 {
@@ -114,6 +127,20 @@ bool hit_plane(Ray ray, Plane plane, inout Hit hit)
 	hit = Hit(t, ro + t * rd, pn, plane.m_id, plane.m_material);
 	//return
 	return t > t_min;
+}
+bool hit_board(Ray ray, Board board, inout Hit hit)
+{
+	if(hit_plane(ray, Plane(board.m_id, board.m_point, board.m_normal, board.m_material_1), hit))
+	{
+		bool test_1 = fract(hit.m_point[0]) < 0.5 && fract(hit.m_point[2]) < 0.5;
+		bool test_2 = fract(hit.m_point[0]) > 0.5 && fract(hit.m_point[2]) > 0.5;
+		if(test_1 || test_2) hit.m_material = board.m_material_2;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 bool hit_sphere(Ray ray, Sphere sphere, inout Hit hit)
 {
@@ -190,6 +217,17 @@ bool ray_intersection(Ray ray, inout Hit hit)
 			test = true;
 		}
 	}
+	for(int i = 0; i < nb; i++)
+	{
+		if(hit_board(ray, boards[i], object_hit))
+		{
+			if(!test || hit.m_t > object_hit.m_t)
+			{
+				hit = object_hit;
+			}
+			test = true;
+		}
+	}
 	//return
 	return test;
 }
@@ -225,7 +263,7 @@ vec3 ray_color(Ray ray)
 			//shadow
 			if((!ray_intersection(Ray(hit.m_point, L), hit_shadow) || hit_shadow.m_t > d) && dot(N, L) > 0)
 			{
-				color += (int(bd) * kd * fd + ks * fs) * lights[i].m_color * hit.m_material.m_color / d / d * dot(N, L);
+				color += (int(bd) * kd * fd + ks * fs) * lights[i].m_color / d / d * dot(N, L);
 			}
 		}
 		//ambient
