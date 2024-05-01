@@ -81,15 +81,20 @@ void scene_1(void)
 	np = 0;
 	nb = 1;
 	ns = 3;
+	Material board_material_1 = Material(vec3(0), false, 0.2);
+	Material board_material_2 = Material(vec3(1), false, 0.2);
+	Material sphere_material_1 = Material(vec3(1, 0, 0), false, 0.5);
+	Material sphere_material_2 = Material(vec3(0, 1, 0), false, 0.5);
+	Material sphere_material_3 = Material(vec3(0, 0, 1), false, 0.5);
 	//lights
 	light_ambient = Light(0.2 * vec3(1, 1, 1), vec3(0));
-	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 100.0), 2, -2));
+	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 1000.0), 1, -2));
 	//spheres
-	spheres[0] = Sphere(0, vec3(-2, 0, -2), 0.5, Material(vec3(1, 0, 0), false, 0.5));
-	spheres[1] = Sphere(1, vec3(+0, 0, -2), 0.5, Material(vec3(0, 1, 0), false, 0.5));
-	spheres[2] = Sphere(2, vec3(+2, 0, -2), 0.5, Material(vec3(0, 0, 1), false, 0.5));
+	spheres[0] = Sphere(0, vec3(-2, 0, -2), 0.5, sphere_material_1);
+	spheres[1] = Sphere(1, vec3(+0, 0, -2), 0.5, sphere_material_2);
+	spheres[2] = Sphere(2, vec3(+2, 0, -2), 0.5, sphere_material_3);
 	//boards
-	boards[0] = Board(3, vec3(0, -1, 0), vec3(0, 1, 0), Material(vec3(0, 0, 0), false, 0.2), Material(vec3(1, 1, 1), false, 0.2));
+	boards[0] = Board(3, vec3(0, -1, 0), vec3(0, 1, 0), board_material_1, board_material_2);
 }
 void scene_2(void)
 {

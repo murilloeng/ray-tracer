@@ -4,8 +4,9 @@
 !*.sh
 !*.cpp
 !*.hpp
+!*.sln
 !*.vert
 !*.frag
-!*.json
+!*.vcxproj
 !*Makefile
 !.gitignore
