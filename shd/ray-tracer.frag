@@ -18,7 +18,7 @@ struct Light
 struct Material
 {
 	vec3 m_color;
-	bool m_metalic;
+	float m_metalic;
 	float m_roughness;
 };
 struct Hit
@@ -68,7 +68,7 @@ Plane planes[np_max];
 Board boards[nc_max];
 Sphere spheres[ns_max];
 
-const float t_min = 1e-5;
+const float t_min = 1e-3;
 const float focal_length = 1;
 const float pi = 3.141592654;
 const int reflection_max = 16;
@@ -81,14 +81,14 @@ void scene_1(void)
 	np = 0;
 	nb = 1;
 	ns = 3;
-	Material board_material_1 = Material(vec3(0), false, 0.2);
-	Material board_material_2 = Material(vec3(1), false, 0.2);
-	Material sphere_material_1 = Material(vec3(1, 0, 0), false, 0.5);
-	Material sphere_material_2 = Material(vec3(0, 1, 0), false, 0.5);
-	Material sphere_material_3 = Material(vec3(0, 0, 1), false, 0.5);
+	Material board_material_1 = Material(vec3(0), 0, 0.2);
+	Material board_material_2 = Material(vec3(1), 0, 0.2);
+	Material sphere_material_1 = Material(vec3(1, 0, 0), 0, 0.1);
+	Material sphere_material_2 = Material(vec3(0, 1, 0), 0, 0.1);
+	Material sphere_material_3 = Material(vec3(0, 0, 1), 0, 0.1);
 	//lights
-	light_ambient = Light(0.2 * vec3(1, 1, 1), vec3(0));
-	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 1000.0), 1, -2));
+	light_ambient = Light(0.1 * vec3(1, 1, 1), vec3(0));
+	lights[0] = Light(100 * vec3(1, 1, 1), vec3(4 * sin(frame / 2000.0), 1, -2));
 	//spheres
 	spheres[0] = Sphere(0, vec3(-2, 0, -2), 0.5, sphere_material_1);
 	spheres[1] = Sphere(1, vec3(+0, 0, -2), 0.5, sphere_material_2);
@@ -107,9 +107,9 @@ void scene_2(void)
 	light_ambient = Light(0 * vec3(1, 1, 1), vec3(0));
 	lights[0] = Light(2 * vec3(1, 1, 1), vec3(sin(frame / 20.0), 0, cos(frame / 20.0) - 2));
 	//spheres
-	spheres[0] = Sphere(0, vec3(0, 0, -2), 0.5, Material(vec3(0, 0, 1), false, 0.8));
+	spheres[0] = Sphere(0, vec3(0, 0, -2), 0.5, Material(vec3(0, 0, 1), 0, 0.8));
 	//planes
-	planes[0] = Plane(1, vec3(0, -1, 0), vec3(0, 1, 0), Material(vec3(0.5, 0.5, 0.5), false, 0.2));
+	planes[0] = Plane(1, vec3(0, -1, 0), vec3(0, 1, 0), Material(vec3(0.5, 0.5, 0.5), 0, 0.2));
 }
 void scene(void)
 {
@@ -180,17 +180,18 @@ float normal_distribution(float alpha, vec3 N, vec3 H)
 }
 float shadowing(float alpha, vec3 N, vec3 X)
 {
-	float k = alpha / 2;
 	float dNX = max(dot(N, X), 0);
+	float k = pow(1 + alpha, 2) / 2;
 	return dNX / (k + (1 - k) * dNX);
 }
 float shadowing(float alpha, vec3 N, vec3 V, vec3 L)
 {
 	return shadowing(alpha, N, V) * shadowing(alpha, N, L);
 }
-vec3 fresnel(vec3 F0, vec3 V, vec3 H)
+vec3 fresnel(vec3 F0, vec3 V, vec3 H, float metalic)
 {
 	float dVH = max(dot(V, H), 0);
+	F0 = mix(vec3(0.04), F0, metalic);
 	return F0 + (vec3(1) - F0) * pow(1 - dVH, 5);
 }
 
@@ -239,40 +240,48 @@ bool ray_intersection(Ray ray, inout Hit hit)
 vec3 ray_color(Ray ray)
 {
 	//data
+	Ray ray_reflection;
 	Hit hit, hit_shadow;
-	vec3 color = vec3(0);
+	vec3 color = vec3(0), reflection_factor;
 	//color
-	if(ray_intersection(ray, hit))
+	for(int light_index = 0; light_index < nl; light_index++)
 	{
-		//lights
-		for(int i = 0; i < nl; i++)
+		ray_reflection = ray;
+		reflection_factor = vec3(1);
+		for(int reflection_index = 0; reflection_index < reflection_max; reflection_index++)
 		{
+			//check
+			if(!ray_intersection(ray_reflection, hit)) break;
+			//ambient
+			if(light_index == 0 && reflection_index == 0)
+			{
+				color += light_ambient.m_color * hit.m_material.m_color;
+			}
 			//data
 			vec3 N = hit.m_normal;
 			vec3 V = normalize(camera_position - hit.m_point);
-			vec3 L = normalize(lights[i].m_position - hit.m_point);
+			vec3 L = normalize(lights[light_index].m_position - hit.m_point);
 			//PBR model
 			vec3 H = normalize(L + V);
 			float dNV = max(dot(N, V), 0);
 			float dNL = max(dot(N, L), 0);
-			vec3 F = fresnel(hit.m_material.m_color, V, H);
-			float d = length(lights[i].m_position - hit.m_point);
 			float G = shadowing(hit.m_material.m_roughness, N, V, L);
+			float d = length(lights[light_index].m_position - hit.m_point);
 			float D = normal_distribution(hit.m_material.m_roughness, N, H);
+			vec3 F = fresnel(hit.m_material.m_color, V, H, hit.m_material.m_metalic);
 			//PBR diffuse
 			vec3 ks = F;
 			vec3 kd = 1 - F;
-			bool bd = !hit.m_material.m_metalic;
 			vec3 fs = vec3(D * G / 4 / dNV / dNL);
 			vec3 fd = hit.m_material.m_color / pi;
 			//shadow
 			if((!ray_intersection(Ray(hit.m_point, L), hit_shadow) || hit_shadow.m_t > d) && dot(N, L) > 0)
 			{
-				color += (int(bd) * kd * fd + ks * fs) * lights[i].m_color / d / d * dot(N, L);
+				color += reflection_factor * (kd * fd + ks * fs) * lights[light_index].m_color / d / d * dot(N, L);
 			}
+			reflection_factor = 0.2 * F;
+			ray_reflection = Ray(hit.m_point, reflect(ray_reflection.m_direction, hit.m_normal));
 		}
-		//ambient
-		color += light_ambient.m_color * hit.m_material.m_color;
 	}
 	//return
 	return color;
