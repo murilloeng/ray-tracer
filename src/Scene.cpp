@@ -62,7 +62,7 @@ namespace ray_tracer
 	{
 		//shaders
 		m_program->vertex_shader()->path("shd/ray-tracer.vert");
-		m_program->fragment_shader()->path("shd/ray-tracer.frag");
+		m_program->fragment_shader()->path("shd/ray-tracer-2.frag");
 		//program
 		m_program->setup();
 	}
