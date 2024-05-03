@@ -27,6 +27,7 @@ struct Camera
 struct Material
 {
 	vec3 m_color;
+	float m_roughness;
 };
 struct Hit
 {
@@ -116,16 +117,17 @@ void scene_1(void)
 	camera.m_position = vec3(0, 0, 0);
 	camera.m_vertical = vec3(0, 1, 0);
 	//materials
-	Material sphere_material = Material(vec3(0, 0, 1));
-	Material board_material_1 = Material(vec3(0, 0, 0));
-	Material board_material_2 = Material(vec3(1, 1, 1));
+	Material sphere_material = Material(vec3(0, 0, 1), 0);
+	Material board_material_1 = Material(vec3(0, 0, 0), 0);
+	Material board_material_2 = Material(vec3(1, 1, 1), 0);
 	//objects
 	spheres[0] = Sphere(vec3(0, 0, -2), 0.5, sphere_material);
 	boards[0] = Board(vec3(0, -1, 0), vec3(0, 1, 0), board_material_1, board_material_2);
 	//lights
+	float t = frame / 40.0;
 	lights_ambient[0] = Light_Ambient(vec3(1, 1, 1), 0.1);
-	lights_direction[0] = Light_Direction(vec3(1, 1, 1), vec3(cos(PI / 4), -sin(PI / 4), 0), 1);
-	lights_point[0] = Light_Point(vec3(1, 1, 1), vec3(10 * cos(PI / 4), 10 * sin(PI / 4), -2), 100);
+	lights_direction[0] = Light_Direction(vec3(1, 1, 1), -vec3(cos(t), sin(t), 0), 1);
+	lights_point[0] = Light_Point(vec3(1, 1, 1), vec3(3, 3, -2), sin(t) < 0 ? 100 : 0);
 }
 void scene_2(void)
 {
@@ -268,7 +270,7 @@ void ray_illumination_point(Ray ray, inout vec3 color)
 			vec3 light_color = lights_point[light_index].m_color;
 			vec3 light_position = lights_point[light_index].m_position;
 			vec3 light_direction = normalize(light_position - hit.m_point);
-			float light_intensity = lights_point[light_index].m_intensity / pow(length(hit.m_point - light_position), 2);
+			float light_intensity = lights_point[light_index].m_intensity / pow(length(light_position - hit.m_point), 2);
 			if(dot(hit.m_normal, light_direction) > 0 && !ray_intersection(Ray(hit.m_point, light_direction), hit_shadow))
 			{
 				color += light_intensity * light_color * hit.m_material.m_color * dot(hit.m_normal, light_direction);
